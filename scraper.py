@@ -11,7 +11,7 @@ APPS = {
 
 RAW_DATA_PATH = "data/gojek_grab_raw.csv"
 CLEAN_DATA_PATH = "gojek_grab_final.csv"  
-TARGET_PER_RUN = 200
+TARGET_PER_RUN = 2500
 
 # Kamus normalisasi bahasa gaul
 KAMUS_NORMALISASI = {
