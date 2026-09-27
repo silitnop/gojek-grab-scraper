@@ -1,0 +1,30 @@
+name: Scrape Play Store Reviews
+
+on:
+  schedule:
+    - cron: "0 1 * * *"   # tiap hari jam 01:00 UTC = 08:00 WIB
+  workflow_dispatch:        # biar bisa dipicu manual dari tab Actions di GitHub
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Jalankan scraper
+        run: python scraper.py
+
+      - name: Commit & push data baru
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "actions@github.com"
+          git add data/gojek_grab_raw.csv
+          git commit -m "Auto scrape $(date +'%Y-%m-%d')" || echo "Tidak ada perubahan data"
+          git push
