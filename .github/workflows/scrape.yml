@@ -25,6 +25,6 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "actions@github.com"
-          git add data/gojek_grab_raw.csv
+          git add data/gojek_grab_raw.csv gojek_grab_final.csv
           git commit -m "Auto scrape $(date +'%Y-%m-%d')" || echo "Tidak ada perubahan data"
           git push
