@@ -1,9 +1,6 @@
-"""
-Scraper otomatis buat review Gojek & Grab dari Play Store.
-Beda sama versi notebook: script ini AMAN dijalanin berkali-kali,
-karena otomatis buang data yang reviewId-nya udah ada (gak dobel).
-"""
+
 import os
+import re
 import pandas as pd
 from google_play_scraper import Sort, reviews
 
@@ -12,11 +9,43 @@ APPS = {
     "Grab": "com.grabtaxi.passenger",
 }
 
-DATA_PATH = "data/gojek_grab_raw.csv"
-# Tiap run cukup ambil beberapa ratus review terbaru aja, bukan 5000 -
-# yang lama udah kesimpen, kita cuma nambahin yang baru muncul sejak run terakhir.
+RAW_DATA_PATH = "data/gojek_grab_raw.csv"
+CLEAN_DATA_PATH = "gojek_grab_final.csv"  
 TARGET_PER_RUN = 200
 
+# Kamus normalisasi bahasa gaul
+KAMUS_NORMALISASI = {
+    'gk': 'tidak', 'gak': 'tidak', 'nggak': 'tidak',
+    'bgt': 'banget', 'bgd': 'banget', 'yg': 'yang',
+    'tp': 'tapi', 'utk': 'untuk', 'dgn': 'dengan',
+    'driverny': 'driver', 'drivernya': 'driver',
+    'abg': 'abang', 'jg': 'juga', 'org': 'orang',
+    'tlp': 'telepon', 'trs': 'terus', 'bikin': 'buat',
+    'lemot': 'lambat', 'lelet': 'lambat'
+}
+
+def full_cleaning(text):
+    if not isinstance(text, str):
+        return ""
+    text = text.lower()
+    text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
+    text = re.sub(r'[^\w\s]', ' ', text)
+    text = re.sub(r'\d+', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    words = text.split()
+    normalized_words = [KAMUS_NORMALISASI.get(word, word) for word in words]
+    return ' '.join(normalized_words)
+
+def categorize_sentiment(score):
+    if score in [1, 2]:
+        return 'Negatif'
+    elif score == 3:
+        return 'Netral'
+    elif score in [4, 5]:
+        return 'Positif'
+    else:
+        return 'Unknown'
 
 def scrape_app(app_id: str, target_count: int) -> pd.DataFrame:
     all_reviews = []
@@ -40,7 +69,6 @@ def scrape_app(app_id: str, target_count: int) -> pd.DataFrame:
 
     return pd.DataFrame(all_reviews)
 
-
 def main():
     frames = []
     for name, app_id in APPS.items():
@@ -52,21 +80,29 @@ def main():
 
     new_df = pd.concat(frames, ignore_index=True)
 
-    os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
+    os.makedirs(os.path.dirname(RAW_DATA_PATH), exist_ok=True)
 
-    if os.path.exists(DATA_PATH):
-        old_df = pd.read_csv(DATA_PATH)
-        before = len(old_df)
-        combined = pd.concat([old_df, new_df], ignore_index=True)
-        combined = combined.drop_duplicates(subset="reviewId", keep="first")
-        print(f"Data lama: {before} baris, data baru unik ditambahin: {len(combined) - before} baris")
+    
+    if os.path.exists(RAW_DATA_PATH):
+        old_df = pd.read_csv(RAW_DATA_PATH)
+        combined_raw = pd.concat([old_df, new_df], ignore_index=True)
+        combined_raw = combined_raw.drop_duplicates(subset="reviewId", keep="first")
     else:
-        combined = new_df.drop_duplicates(subset="reviewId", keep="first")
-        print(f"Belum ada data lama, mulai dari nol: {len(combined)} baris")
+        combined_raw = new_df.drop_duplicates(subset="reviewId", keep="first")
 
-    combined.to_csv(DATA_PATH, index=False, encoding="utf-8")
-    print(f"Total data sekarang: {len(combined)} baris. Disimpan ke {DATA_PATH}")
+    
+    combined_raw.to_csv(RAW_DATA_PATH, index=False, encoding="utf-8")
+    print(f"Raw data total: {len(combined_raw)} baris tersimpan.")
 
+   
+    print("Menjalankan proses cleaning dan pelabelan sentimen...")
+    combined_raw['cleaned_content'] = combined_raw['content'].apply(full_cleaning)
+    combined_raw = combined_raw[combined_raw['cleaned_content'] != '']
+    combined_raw['sentiment'] = combined_raw['score'].apply(categorize_sentiment)
+
+   
+    combined_raw.to_csv(CLEAN_DATA_PATH, index=False, encoding="utf-8")
+    print(f"File bersih berhasil diperbarui ke '{CLEAN_DATA_PATH}' ({len(combined_raw)} baris).")
 
 if __name__ == "__main__":
     main()
