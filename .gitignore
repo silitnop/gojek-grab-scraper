@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Google Cloud credentials
+gojek-grab-analytics-dd28e586a3a0.json
